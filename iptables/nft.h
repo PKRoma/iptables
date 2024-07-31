@@ -275,4 +275,16 @@ void nft_assert_table_compatible(struct nft_handle *h,
 int ebt_set_user_chain_policy(struct nft_handle *h, const char *table,
 			      const char *chain, const char *policy);
 
+struct nftnl_udata;
+
+enum udata_type {
+	UDATA_TYPE_COMMENT,
+	UDATA_TYPE_EBTABLES_POLICY,
+	UDATA_TYPE_COMPAT_EXT,
+	__UDATA_TYPE_MAX,
+};
+#define UDATA_TYPE_MAX (__UDATA_TYPE_MAX - 1)
+
+int parse_udata_cb(const struct nftnl_udata *attr, void *data);
+
 #endif

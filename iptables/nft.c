@@ -1670,14 +1670,7 @@ int add_counters(struct nftnl_rule *r, uint64_t packets, uint64_t bytes)
 	return 0;
 }
 
-enum udata_type {
-	UDATA_TYPE_COMMENT,
-	UDATA_TYPE_EBTABLES_POLICY,
-	__UDATA_TYPE_MAX,
-};
-#define UDATA_TYPE_MAX (__UDATA_TYPE_MAX - 1)
-
-static int parse_udata_cb(const struct nftnl_udata *attr, void *data)
+int parse_udata_cb(const struct nftnl_udata *attr, void *data)
 {
 	unsigned char *value = nftnl_udata_get(attr);
 	uint8_t type = nftnl_udata_type(attr);
@@ -1690,6 +1683,8 @@ static int parse_udata_cb(const struct nftnl_udata *attr, void *data)
 			return -1;
 		break;
 	case UDATA_TYPE_EBTABLES_POLICY:
+		break;
+	case UDATA_TYPE_COMPAT_EXT:
 		break;
 	default:
 		return 0;
