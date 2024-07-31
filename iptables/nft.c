@@ -9,6 +9,7 @@
  * This code has been sponsored by Sophos Astaro <http://www.sophos.com>
  */
 
+#include "config.h"
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/types.h>
@@ -60,6 +61,7 @@
 #include "nft-cache.h"
 #include "nft-shared.h"
 #include "nft-bridge.h" /* EBT_NOPROTO */
+#include "nft-compat.h"
 
 static void *nft_fn;
 
@@ -1046,9 +1048,11 @@ void __add_match(struct nftnl_expr *e, const struct xt_entry_match *m)
 	nftnl_expr_set(e, NFTNL_EXPR_MT_INFO, info, m->u.match_size - sizeof(*m));
 }
 
-static int add_nft_limit(struct nftnl_rule *r, struct xt_entry_match *m)
+static int add_nft_limit(struct nft_handle *h, struct nftnl_rule *r,
+			 struct xt_entry_match *m)
 {
 	struct xt_rateinfo *rinfo = (void *)m->data;
+	int i, ecnt = nftnl_rule_expr_count(r);
 	static const uint32_t mult[] = {
 		XT_LIMIT_SCALE*24*60*60,	/* day */
 		XT_LIMIT_SCALE*60*60,		/* hour */
@@ -1056,7 +1060,8 @@ static int add_nft_limit(struct nftnl_rule *r, struct xt_entry_match *m)
 		XT_LIMIT_SCALE,			/* sec */
 	};
 	struct nftnl_expr *expr;
-	int i;
+
+	rule_add_udata_match(h, r, ecnt, ecnt + 1, m);
 
 	expr = nftnl_expr_alloc("limit");
 	if (!expr)
@@ -1371,6 +1376,7 @@ static bool udp_all_zero(const struct xt_udp *u)
 static int add_nft_udp(struct nft_handle *h, struct nftnl_rule *r,
 		       struct xt_entry_match *m)
 {
+	int ret, ecnt = nftnl_rule_expr_count(r);
 	struct xt_udp *udp = (void *)m->data;
 
 	if (udp->invflags > XT_UDP_INV_MASK ||
@@ -1385,8 +1391,12 @@ static int add_nft_udp(struct nft_handle *h, struct nftnl_rule *r,
 	if (nftnl_rule_get_u32(r, NFTNL_RULE_COMPAT_PROTO) != IPPROTO_UDP)
 		xtables_error(PARAMETER_PROBLEM, "UDP match requires '-p udp'");
 
-	return add_nft_tcpudp(h, r, udp->spts, udp->invflags & XT_UDP_INV_SRCPT,
-			      udp->dpts, udp->invflags & XT_UDP_INV_DSTPT);
+	ret = add_nft_tcpudp(h, r, udp->spts, udp->invflags & XT_UDP_INV_SRCPT,
+			     udp->dpts, udp->invflags & XT_UDP_INV_DSTPT);
+
+	rule_add_udata_match(h, r, ecnt, nftnl_rule_expr_count(r), m);
+
+	return ret;
 }
 
 static int add_nft_tcpflags(struct nft_handle *h, struct nftnl_rule *r,
@@ -1423,6 +1433,7 @@ static int add_nft_tcp(struct nft_handle *h, struct nftnl_rule *r,
 		       struct xt_entry_match *m)
 {
 	static const uint8_t supported = XT_TCP_INV_SRCPT | XT_TCP_INV_DSTPT | XT_TCP_INV_FLAGS;
+	int ret, ecnt = nftnl_rule_expr_count(r);
 	struct xt_tcp *tcp = (void *)m->data;
 
 	if (tcp->invflags & ~supported || tcp->option ||
@@ -1438,23 +1449,27 @@ static int add_nft_tcp(struct nft_handle *h, struct nftnl_rule *r,
 		xtables_error(PARAMETER_PROBLEM, "TCP match requires '-p tcp'");
 
 	if (tcp->flg_mask) {
-		int ret = add_nft_tcpflags(h, r, tcp->flg_cmp, tcp->flg_mask,
-					   tcp->invflags & XT_TCP_INV_FLAGS);
+		ret = add_nft_tcpflags(h, r, tcp->flg_cmp, tcp->flg_mask,
+				       tcp->invflags & XT_TCP_INV_FLAGS);
 
 		if (ret < 0)
 			return ret;
 	}
 
-	return add_nft_tcpudp(h, r, tcp->spts, tcp->invflags & XT_TCP_INV_SRCPT,
-			      tcp->dpts, tcp->invflags & XT_TCP_INV_DSTPT);
+	ret = add_nft_tcpudp(h, r, tcp->spts, tcp->invflags & XT_TCP_INV_SRCPT,
+			     tcp->dpts, tcp->invflags & XT_TCP_INV_DSTPT);
+
+	rule_add_udata_match(h, r, ecnt, nftnl_rule_expr_count(r), m);
+
+	return ret;
 }
 
 static int add_nft_mark(struct nft_handle *h, struct nftnl_rule *r,
 			struct xt_entry_match *m)
 {
 	struct xt_mark_mtinfo1 *mark = (void *)m->data;
+	int op, ecnt = nftnl_rule_expr_count(r);
 	uint8_t reg;
-	int op;
 
 	add_meta(h, r, NFT_META_MARK, &reg);
 	if (mark->mask != 0xffffffff)
@@ -1466,6 +1481,8 @@ static int add_nft_mark(struct nft_handle *h, struct nftnl_rule *r,
 		op = NFT_CMP_EQ;
 
 	add_cmp_u32(r, mark->mark, op, reg);
+
+	rule_add_udata_match(h, r, ecnt, nftnl_rule_expr_count(r), m);
 
 	return 0;
 }
@@ -1480,7 +1497,7 @@ int add_match(struct nft_handle *h, struct nft_rule_ctx *ctx,
 	case NFT_COMPAT_RULE_INSERT:
 	case NFT_COMPAT_RULE_REPLACE:
 		if (!strcmp(m->u.user.name, "limit"))
-			return add_nft_limit(r, m);
+			return add_nft_limit(h, r, m);
 		else if (!strcmp(m->u.user.name, "among"))
 			return add_nft_among(h, r, m);
 		else if (!strcmp(m->u.user.name, "udp"))
@@ -1517,9 +1534,13 @@ void __add_target(struct nftnl_expr *e, const struct xt_entry_target *t)
 	nftnl_expr_set(e, NFTNL_EXPR_TG_INFO, info, t->u.target_size - sizeof(*t));
 }
 
-static int add_meta_nftrace(struct nftnl_rule *r)
+static int add_meta_nftrace(struct nft_handle *h, struct nftnl_rule *r,
+			    struct xt_entry_target *t)
 {
+	int ecnt = nftnl_rule_expr_count(r);
 	struct nftnl_expr *expr;
+
+	rule_add_udata_target(h, r, ecnt, ecnt + 2, t);
 
 	expr = nftnl_expr_alloc("immediate");
 	if (expr == NULL)
@@ -1545,7 +1566,7 @@ int add_target(struct nft_handle *h, struct nftnl_rule *r,
 	struct nftnl_expr *expr;
 
 	if (strcmp(t->u.user.name, "TRACE") == 0)
-		return add_meta_nftrace(r);
+		return add_meta_nftrace(h, r, t);
 
 	expr = nftnl_expr_alloc("target");
 	if (expr == NULL)
@@ -1588,7 +1609,8 @@ int add_verdict(struct nftnl_rule *r, int verdict)
 	return 0;
 }
 
-static int add_log(struct nftnl_rule *r, struct iptables_command_state *cs);
+static int add_log(struct nft_handle *h, struct nftnl_rule *r,
+		   struct iptables_command_state *cs);
 
 int add_action(struct nft_handle *h, struct nftnl_rule *r,
 	       struct iptables_command_state *cs, bool goto_set)
@@ -1605,7 +1627,7 @@ int add_action(struct nft_handle *h, struct nftnl_rule *r,
 		else if (strcmp(cs->jumpto, XTC_LABEL_RETURN) == 0)
 			ret = add_verdict(r, NFT_RETURN);
 		else if (strcmp(cs->jumpto, "NFLOG") == 0)
-			ret = add_log(r, cs);
+			ret = add_log(h, r, cs);
 		else
 			ret = add_target(h, r, cs->target->t);
 	} else if (strlen(cs->jumpto) > 0) {
@@ -1618,10 +1640,14 @@ int add_action(struct nft_handle *h, struct nftnl_rule *r,
 	return ret;
 }
 
-static int add_log(struct nftnl_rule *r, struct iptables_command_state *cs)
+static int add_log(struct nft_handle *h, struct nftnl_rule *r,
+		   struct iptables_command_state *cs)
 {
 	struct nftnl_expr *expr;
 	struct xt_nflog_info *info = (struct xt_nflog_info *)cs->target->t->data;
+	int ecnt = nftnl_rule_expr_count(r);
+
+	rule_add_udata_target(h, r, ecnt, ecnt + 1, cs->target->t);
 
 	expr = nftnl_expr_alloc("log");
 	if (!expr)
@@ -4041,4 +4067,11 @@ void nft_assert_table_compatible(struct nft_handle *h,
 	xtables_error(OTHER_PROBLEM,
 		      "%s%s%stable `%s' is incompatible, use 'nft' tool.",
 		      pfx, chain, sfx, table);
+}
+
+uint8_t compat_env_val(void)
+{
+	const char *val = getenv("XTABLES_COMPAT");
+
+	return val ? atoi(val) : 0;
 }

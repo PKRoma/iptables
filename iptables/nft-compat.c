@@ -22,6 +22,21 @@
 
 #include <libnftnl/udata.h>
 
+int nftnl_rule_expr_count(const struct nftnl_rule *r)
+{
+	struct nftnl_expr_iter *iter = nftnl_expr_iter_create(r);
+	int cnt = 0;
+
+	if (!iter)
+		return -1;
+
+	while (nftnl_expr_iter_next(iter))
+		cnt++;
+
+	nftnl_expr_iter_destroy(iter);
+	return cnt;
+}
+
 static struct rule_udata_ext *
 rule_get_udata_ext(const struct nftnl_rule *r, uint32_t *outlen)
 {
@@ -42,6 +57,65 @@ rule_get_udata_ext(const struct nftnl_rule *r, uint32_t *outlen)
 	if (outlen)
 		*outlen = nftnl_udata_len(tb[UDATA_TYPE_COMPAT_EXT]);
 	return nftnl_udata_get(tb[UDATA_TYPE_COMPAT_EXT]);
+}
+
+static void
+pack_rule_udata_ext_data(struct rule_udata_ext *rue,
+			 const void *data, size_t datalen)
+{
+	size_t datalen_out = datalen;
+#ifdef HAVE_ZLIB
+	compress(rue->data, &datalen_out, data, datalen);
+	rue->flags |= RUE_FLAG_ZIP;
+#else
+	memcpy(rue->data, data, datalen);
+#endif
+	rue->size = datalen_out;
+}
+
+void rule_add_udata_ext(struct nft_handle *h, struct nftnl_rule *r,
+			uint16_t start_idx, uint16_t end_idx,
+			uint8_t flags, uint16_t size, const void *data)
+{
+	struct rule_udata_ext *ext = NULL;
+	uint32_t extlen = 0, newextlen;
+	char *newext;
+	void *udata;
+
+	if (!h->compat)
+		return;
+
+	ext = rule_get_udata_ext(r, &extlen);
+	if (!ext)
+		extlen = 0;
+
+	udata = nftnl_udata_buf_alloc(NFT_USERDATA_MAXLEN);
+	if (!udata)
+		xtables_error(OTHER_PROBLEM, "can't alloc memory!");
+
+	newextlen = sizeof(*ext) + size;
+	newext = xtables_malloc(extlen + newextlen);
+	if (extlen)
+		memcpy(newext, ext, extlen);
+	memset(newext + extlen, 0, newextlen);
+
+	ext = (struct rule_udata_ext *)(newext + extlen);
+	ext->start_idx	= start_idx;
+	ext->end_idx	= end_idx;
+	ext->flags	= flags;
+	ext->orig_size	= size;
+	pack_rule_udata_ext_data(ext, data, size);
+	newextlen = sizeof(*ext) + ext->size;
+
+	if (!nftnl_udata_put(udata, UDATA_TYPE_COMPAT_EXT,
+			     extlen + newextlen, newext) ||
+	    nftnl_rule_set_data(r, NFTNL_RULE_USERDATA,
+				nftnl_udata_buf_data(udata),
+				nftnl_udata_buf_len(udata)))
+		xtables_error(OTHER_PROBLEM, "can't alloc memory!");
+
+	free(newext);
+	nftnl_udata_buf_free(udata);
 }
 
 static struct nftnl_expr *

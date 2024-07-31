@@ -1254,6 +1254,9 @@ void xtables_printhelp(struct iptables_command_state *cs)
 		printf(
 "[!] --fragment	-f		match second or further fragments only\n");
 
+	if (strstr(xt_params->program_version, "nf_tables"))
+	printf(
+"  --compat			append compatibility data to new rules\n");
 	printf(
 "  --modprobe=<command>		try to insert modules using this command\n"
 "  --set-counters -c PKTS BYTES	set the counter during insert/append\n"
@@ -1917,6 +1920,10 @@ void do_parse(int argc, char *argv[],
 				return;
 
 			exit_tryhelp(2, p->line);
+
+		case 20: /* --compat */
+			p->compat++;
+			break;
 
 		case 1: /* non option */
 			if (optarg[0] == '!' && optarg[1] == '\0') {

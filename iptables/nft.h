@@ -108,6 +108,7 @@ struct nft_handle {
 	struct nft_cache_req	cache_req;
 	bool			restore;
 	bool			noflush;
+	uint8_t			compat;
 	int8_t			config_done;
 	struct list_head	cmd_list;
 	bool			cache_init;
@@ -288,5 +289,7 @@ enum udata_type {
 #define UDATA_TYPE_MAX (__UDATA_TYPE_MAX - 1)
 
 int parse_udata_cb(const struct nftnl_udata *attr, void *data);
+
+uint8_t compat_env_val(void);
 
 #endif

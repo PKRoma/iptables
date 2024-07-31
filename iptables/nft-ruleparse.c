@@ -950,7 +950,7 @@ bool nft_rule_to_iptables_command_state(struct nft_handle *h,
 			ret = false;
 		expr = nftnl_expr_iter_next(ctx.iter);
 	}
-	if (!ret && rule_has_udata_ext(r)) {
+	if ((!ret || h->compat > 1) && rule_has_udata_ext(r)) {
 		fprintf(stderr,
 			"Warning: Rule parser failed, trying compat fallback\n");
 
