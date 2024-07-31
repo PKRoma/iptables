@@ -1034,7 +1034,7 @@ int nft_chain_set(struct nft_handle *h, const char *table,
 	return 1;
 }
 
-static int __add_match(struct nftnl_expr *e, struct xt_entry_match *m)
+void __add_match(struct nftnl_expr *e, const struct xt_entry_match *m)
 {
 	void *info;
 
@@ -1044,8 +1044,6 @@ static int __add_match(struct nftnl_expr *e, struct xt_entry_match *m)
 	info = xtables_calloc(1, m->u.match_size);
 	memcpy(info, m->data, m->u.match_size - sizeof(*m));
 	nftnl_expr_set(e, NFTNL_EXPR_MT_INFO, info, m->u.match_size - sizeof(*m));
-
-	return 0;
 }
 
 static int add_nft_limit(struct nftnl_rule *r, struct xt_entry_match *m)
@@ -1378,11 +1376,10 @@ static int add_nft_udp(struct nft_handle *h, struct nftnl_rule *r,
 	if (udp->invflags > XT_UDP_INV_MASK ||
 	    udp_all_zero(udp)) {
 		struct nftnl_expr *expr = nftnl_expr_alloc("match");
-		int ret;
 
-		ret = __add_match(expr, m);
+		__add_match(expr, m);
 		nftnl_rule_add_expr(r, expr);
-		return ret;
+		return 0;
 	}
 
 	if (nftnl_rule_get_u32(r, NFTNL_RULE_COMPAT_PROTO) != IPPROTO_UDP)
@@ -1431,11 +1428,10 @@ static int add_nft_tcp(struct nft_handle *h, struct nftnl_rule *r,
 	if (tcp->invflags & ~supported || tcp->option ||
 	    tcp_all_zero(tcp)) {
 		struct nftnl_expr *expr = nftnl_expr_alloc("match");
-		int ret;
 
-		ret = __add_match(expr, m);
+		__add_match(expr, m);
 		nftnl_rule_add_expr(r, expr);
-		return ret;
+		return 0;
 	}
 
 	if (nftnl_rule_get_u32(r, NFTNL_RULE_COMPAT_PROTO) != IPPROTO_TCP)
@@ -1478,7 +1474,6 @@ int add_match(struct nft_handle *h, struct nft_rule_ctx *ctx,
 	      struct nftnl_rule *r, struct xt_entry_match *m)
 {
 	struct nftnl_expr *expr;
-	int ret;
 
 	switch (ctx->command) {
 	case NFT_COMPAT_RULE_APPEND:
@@ -1503,13 +1498,13 @@ int add_match(struct nft_handle *h, struct nft_rule_ctx *ctx,
 	if (expr == NULL)
 		return -ENOMEM;
 
-	ret = __add_match(expr, m);
+	__add_match(expr, m);
 	nftnl_rule_add_expr(r, expr);
 
-	return ret;
+	return 0;
 }
 
-static int __add_target(struct nftnl_expr *e, struct xt_entry_target *t)
+void __add_target(struct nftnl_expr *e, const struct xt_entry_target *t)
 {
 	void *info;
 
@@ -1520,8 +1515,6 @@ static int __add_target(struct nftnl_expr *e, struct xt_entry_target *t)
 	info = xtables_calloc(1, t->u.target_size);
 	memcpy(info, t->data, t->u.target_size - sizeof(*t));
 	nftnl_expr_set(e, NFTNL_EXPR_TG_INFO, info, t->u.target_size - sizeof(*t));
-
-	return 0;
 }
 
 static int add_meta_nftrace(struct nftnl_rule *r)
@@ -1549,7 +1542,6 @@ static int add_meta_nftrace(struct nftnl_rule *r)
 int add_target(struct nftnl_rule *r, struct xt_entry_target *t)
 {
 	struct nftnl_expr *expr;
-	int ret;
 
 	if (strcmp(t->u.user.name, "TRACE") == 0)
 		return add_meta_nftrace(r);
@@ -1558,10 +1550,10 @@ int add_target(struct nftnl_rule *r, struct xt_entry_target *t)
 	if (expr == NULL)
 		return -ENOMEM;
 
-	ret = __add_target(expr, t);
+	__add_target(expr, t);
 	nftnl_rule_add_expr(r, expr);
 
-	return ret;
+	return 0;
 }
 
 int add_jumpto(struct nftnl_rule *r, const char *name, int verdict)
