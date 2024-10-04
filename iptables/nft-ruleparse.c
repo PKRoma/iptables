@@ -10,6 +10,7 @@
  * This code has been sponsored by Sophos Astaro <http://www.sophos.com>
  */
 
+#include "config.h"
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,6 +28,7 @@
 
 #include <xtables.h>
 
+#include "nft-compat.h"
 #include "nft-ruleparse.h"
 #include "nft.h"
 
@@ -947,6 +949,21 @@ bool nft_rule_to_iptables_command_state(struct nft_handle *h,
 		if (!nft_parse_rule_expr(h, expr, &ctx))
 			ret = false;
 		expr = nftnl_expr_iter_next(ctx.iter);
+	}
+	if (!ret && rule_has_udata_ext(r)) {
+		fprintf(stderr,
+			"Warning: Rule parser failed, trying compat fallback\n");
+
+		h->ops->clear_cs(cs);
+		if (h->ops->init_cs)
+			h->ops->init_cs(cs);
+
+		nftnl_expr_iter_destroy(ctx.iter);
+		ctx.iter = nftnl_expr_iter_create(r);
+		if (!ctx.iter)
+			return false;
+
+		ret = rule_parse_udata_ext(&ctx, r);
 	}
 
 	nftnl_expr_iter_destroy(ctx.iter);
