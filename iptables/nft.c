@@ -1595,6 +1595,8 @@ int add_verdict(struct nftnl_rule *r, int verdict)
 	return 0;
 }
 
+static int add_log(struct nftnl_rule *r, struct iptables_command_state *cs);
+
 int add_action(struct nftnl_rule *r, struct iptables_command_state *cs,
 	       bool goto_set)
 {
@@ -1623,7 +1625,7 @@ int add_action(struct nftnl_rule *r, struct iptables_command_state *cs,
 	return ret;
 }
 
-int add_log(struct nftnl_rule *r, struct iptables_command_state *cs)
+static int add_log(struct nftnl_rule *r, struct iptables_command_state *cs)
 {
 	struct nftnl_expr *expr;
 	struct xt_nflog_info *info = (struct xt_nflog_info *)cs->target->t->data;
