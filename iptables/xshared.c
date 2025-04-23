@@ -980,7 +980,7 @@ static void generic_opt_check(struct xt_cmd_parse_ops *ops,
 	 */
 	for (i = 0, optval = 1; i < NUMBER_OF_OPT; optval = (1 << ++i)) {
 		if ((options & optval) &&
-		    (options_v_commands[i] & command) != command)
+		    !(options_v_commands[i] & command))
 			xtables_error(PARAMETER_PROBLEM,
 				      "Illegal option `%s' with this command",
 				      ops->option_name(optval));
