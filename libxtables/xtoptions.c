@@ -145,8 +145,11 @@ static size_t xtopt_esize_by_type(enum xt_option_type type)
 	case XTTYPE_UINT64RC:
 		return xtopt_psize[XTTYPE_UINT64];
 	default:
-		return xtopt_psize[type];
+		break;
 	}
+	if (type < ARRAY_SIZE(xtopt_psize))
+		return xtopt_psize[type];
+	return 0;
 }
 
 static uint64_t htonll(uint64_t val)
@@ -886,6 +889,8 @@ void xtables_option_parse(struct xt_option_call *cb)
 void xtables_option_metavalidate(const char *name,
 				 const struct xt_option_entry *entry)
 {
+	size_t psize;
+
 	for (; entry->name != NULL; ++entry) {
 		if (entry->id >= CHAR_BIT * sizeof(unsigned int) ||
 		    entry->id >= XT_OPTION_OFFSET_SCALE)
@@ -900,19 +905,18 @@ void xtables_option_metavalidate(const char *name,
 					"Oversight?", name, entry->name);
 			continue;
 		}
-		if (entry->type >= ARRAY_SIZE(xtopt_psize) ||
-		    xtopt_psize[entry->type] == 0)
+
+		psize = xtopt_esize_by_type(entry->type);
+		if (!psize)
 			xt_params->exit_err(OTHER_PROBLEM,
 				"%s: entry type of option \"--%s\" cannot be "
 				"combined with XTOPT_PUT\n",
 				name, entry->name);
-		if (xtopt_psize[entry->type] != -1 &&
-		    xtopt_psize[entry->type] != entry->size)
+		else if (psize != -1 && psize != entry->size)
 			xt_params->exit_err(OTHER_PROBLEM,
 				"%s: option \"--%s\" points to a memory block "
 				"of wrong size (expected %zu, got %zu)\n",
-				name, entry->name,
-				xtopt_psize[entry->type], entry->size);
+				name, entry->name, psize, entry->size);
 	}
 }
 
