@@ -1764,6 +1764,31 @@ err:
 	return NULL;
 }
 
+static struct obj_update *obj_update_by_rule(struct nft_handle *h,
+					     struct nftnl_rule *r)
+{
+	struct obj_update *n;
+
+	list_for_each_entry(n, &h->obj_list, head) {
+		if (n->rule == r)
+			return n;
+	}
+	return NULL;
+}
+
+static void copy_nftnl_rule_attr(struct nftnl_rule *to,
+				 const struct nftnl_rule *from,
+				 uint16_t attr)
+{
+	const void *data;
+	uint32_t len;
+
+	if (nftnl_rule_is_set(from, attr)) {
+		data = nftnl_rule_get_data(from, attr, &len);
+		nftnl_rule_set_data(to, attr, data, len);
+	}
+}
+
 int
 nft_rule_append(struct nft_handle *h, const char *chain, const char *table,
 		struct nftnl_rule *r, struct nftnl_rule *ref, bool verbose)
@@ -1775,12 +1800,31 @@ nft_rule_append(struct nft_handle *h, const char *chain, const char *table,
 
 	nft_fn = nft_rule_append;
 
-	if (ref) {
-		nftnl_rule_set_u64(r, NFTNL_RULE_HANDLE,
-				   nftnl_rule_get_u64(ref, NFTNL_RULE_HANDLE));
+	if (ref && !nftnl_rule_is_set(ref, NFTNL_RULE_HANDLE)) {
+		/* replacing a new rule, hijack its obj_update */
+		struct obj_update *n = obj_update_by_rule(h, ref);
+
+		if (!n) {
+			errno = ENOENT;
+			return 0;
+		}
+		if (n->type != NFT_COMPAT_RULE_APPEND &&
+		    n->type != NFT_COMPAT_RULE_INSERT) {
+			errno = EINVAL;
+			return 0;
+		}
+		copy_nftnl_rule_attr(r, ref, NFTNL_RULE_POSITION);
+		copy_nftnl_rule_attr(r, ref, NFTNL_RULE_ID);
+		nftnl_chain_rule_del(ref);
+		nftnl_rule_free(ref);
+		n->rule = r;
+		return 1;
+	} else if (ref) {
+		copy_nftnl_rule_attr(r, ref, NFTNL_RULE_HANDLE);
 		type = NFT_COMPAT_RULE_REPLACE;
-	} else
+	} else {
 		type = NFT_COMPAT_RULE_APPEND;
+	}
 
 	if (batch_rule_add(h, type, r) == NULL)
 		return 0;
