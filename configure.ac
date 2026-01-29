@@ -79,11 +79,12 @@ AC_ARG_ENABLE([profiling],
 	[enable_profiling="$enableval"], [enable_profiling="no"])
 AC_ARG_WITH([zlib], [AS_HELP_STRING([--without-zlib],
 	    [Disable payload compression of rule compat expressions])],
-           [], [with_zlib=yes])
+           [], [with_zlib=check])
 AS_IF([test "x$with_zlib" != xno], [
        AC_CHECK_LIB([z], [compress], ,
-		    AC_MSG_ERROR([No suitable version of zlib found]))
-       AC_DEFINE([HAVE_ZLIB], [1], [Define if you have zlib])
+		    [if test "x$with_zlib" != xcheck; then
+			AC_MSG_ERROR([No suitable version of zlib found])
+		     fi; with_zlib=no])
 ])
 
 AC_MSG_CHECKING([whether $LD knows -Wl,--no-undefined])
@@ -297,7 +298,7 @@ Iptables Configuration:
   nftables support:			${enable_nftables}
   connlabel support:			${enable_connlabel}
   profiling support:			${enable_profiling}
-  compress rule compat expressions:	${with_zlib}
+  compress rule compat expressions:	${with_zlib/check/yes}
 
 Build parameters:
   Put plugins into executable (static):	${enable_static}

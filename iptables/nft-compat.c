@@ -16,7 +16,7 @@
 #include <string.h>
 #include <xtables.h>
 
-#ifdef HAVE_ZLIB
+#ifdef HAVE_LIBZ
 #include <zlib.h>
 #endif
 
@@ -64,7 +64,7 @@ pack_rule_udata_ext_data(struct rule_udata_ext *rue,
 			 const void *data, size_t datalen)
 {
 	size_t datalen_out = datalen;
-#ifdef HAVE_ZLIB
+#ifdef HAVE_LIBZ
 	compress(rue->data, &datalen_out, data, datalen);
 	rue->flags |= RUE_FLAG_ZIP;
 #else
@@ -144,7 +144,7 @@ __nftnl_expr_from_udata_ext(struct rule_udata_ext *rue, const void *data)
 static struct nftnl_expr *
 nftnl_expr_from_zipped_udata_ext(struct rule_udata_ext *rue)
 {
-#ifdef HAVE_ZLIB
+#ifdef HAVE_LIBZ
 	uLongf datalen = rue->orig_size;
 	struct nftnl_expr *expr = NULL;
 	void *data;
