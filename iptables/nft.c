@@ -4008,7 +4008,6 @@ static const char *supported_exprs[] = {
 	"payload",
 	"meta",
 	"cmp",
-	"bitwise",
 	"counter",
 	"immediate",
 	"lookup",
@@ -4033,6 +4032,10 @@ static int nft_is_expr_compatible(struct nftnl_expr *expr, void *data)
 
 	if (!strcmp(name, "log") &&
 	    nftnl_expr_is_set(expr, NFTNL_EXPR_LOG_GROUP))
+		return 0;
+
+	if (!strcmp(name, "bitwise") &&
+	    nftnl_expr_get_u32(expr, NFTNL_EXPR_BITWISE_OP) == NFT_BITWISE_BOOL)
 		return 0;
 
 	return -1;

@@ -243,6 +243,11 @@ static void nft_parse_bitwise(struct nft_xt_ctx *ctx, struct nftnl_expr *e)
 
 	data = nftnl_expr_get(e, NFTNL_EXPR_BITWISE_XOR, &len);
 
+	if (!data) {
+		ctx->errmsg = "missing bitwise xor attribute";
+		return;
+	}
+
 	if (len > sizeof(dreg->bitwise.xor)) {
 		ctx->errmsg = "bitwise xor too large";
 		return;
@@ -251,6 +256,11 @@ static void nft_parse_bitwise(struct nft_xt_ctx *ctx, struct nftnl_expr *e)
 	memcpy(dreg->bitwise.xor, data, len);
 
 	data = nftnl_expr_get(e, NFTNL_EXPR_BITWISE_MASK, &len);
+
+	if (!data) {
+		ctx->errmsg = "missing bitwise mask attribute";
+		return;
+	}
 
 	if (len > sizeof(dreg->bitwise.mask)) {
 		ctx->errmsg = "bitwise mask too large";
