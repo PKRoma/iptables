@@ -31,6 +31,7 @@
 #include <netinet/ether.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/auxv.h>
 #include <sys/statfs.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
@@ -331,8 +332,8 @@ void xtables_announce_chain(const char *name)
 
 void xtables_init(void)
 {
-	/* xtables cannot be used with setuid in a safe way. */
-	if (getuid() != geteuid())
+	/* xtables cannot be used with setuid/setcap in a safe way. */
+	if (getuid() != geteuid() || getauxval(AT_SECURE))
 		_exit(111);
 
 	xtables_libdir = getenv("XTABLES_LIBDIR");
