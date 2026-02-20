@@ -907,7 +907,7 @@ static int parse_rulenumber(const char *rule)
 	return rulenum;
 }
 
-static void parse_rule_range(struct xt_cmd_parse *p, const char *argv)
+static void parse_rule_range(struct xt_cmd_parse *p, char *argv)
 {
 	char *colon = strchr(argv, ':'), *buffer;
 
