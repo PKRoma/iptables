@@ -203,7 +203,14 @@ def load_test_files():
 
 
 def spawn_netns():
-    # prefer unshare module
+    # prefer stdlib unshare function ...
+    try:
+        os.unshare(os.CLONE_NEWNET)
+        return True
+    except Exception as e:
+        pass
+
+    # ... or unshare module
     try:
         import unshare
         unshare.unshare(unshare.CLONE_NEWNET)
