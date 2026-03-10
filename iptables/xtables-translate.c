@@ -297,8 +297,8 @@ static int do_command_xlate(struct nft_handle *h, int argc, char *argv[],
 
 	switch (p.command) {
 	case CMD_APPEND:
-		ret = 1;
-		if (!xlate(h, &p, &cs, &args, true, nft_rule_xlate_add))
+		ret = xlate(h, &p, &cs, &args, true, nft_rule_xlate_add);
+		if (!ret)
 			print_ipt_cmd(argc, argv);
 		break;
 	case CMD_DELETE:
@@ -310,8 +310,8 @@ static int do_command_xlate(struct nft_handle *h, int argc, char *argv[],
 	case CMD_REPLACE:
 		break;
 	case CMD_INSERT:
-		ret = 1;
-		if (!xlate(h, &p, &cs, &args, false, nft_rule_xlate_add))
+		ret = xlate(h, &p, &cs, &args, false, nft_rule_xlate_add);
+		if (!ret)
 			print_ipt_cmd(argc, argv);
 		break;
 	case CMD_FLUSH:
@@ -558,7 +558,7 @@ static int xtables_xlate_main(int family, const char *progname, int argc,
 
 	ret = do_command_xlate(&h, argc, argv, &table, false);
 	if (!ret)
-		fprintf(stderr, "Translation not implemented\n");
+		fprintf(stderr, "Translation not (fully) implemented\n");
 
 	nft_fini(&h);
 	xtables_fini();
