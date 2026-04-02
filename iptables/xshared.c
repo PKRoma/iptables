@@ -1657,8 +1657,7 @@ void do_parse(int argc, char *argv[],
 			cs->protocol = optarg;
 
 			/* This needs to happen here to parse extensions */
-			if (p->ops->proto_parse)
-				p->ops->proto_parse(cs, args);
+			p->ops->proto_parse(cs, args);
 			break;
 
 		case 's':

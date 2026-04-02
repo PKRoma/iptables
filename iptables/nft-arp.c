@@ -452,6 +452,13 @@ out_err:
 	return ret;
 }
 
+static void nft_arp_proto_parse_warn(struct iptables_command_state *cs,
+				     struct xtables_args *args)
+{
+	fprintf(stderr,
+		"Warning: Ignoring '-p' option not supported by arptables\n");
+}
+
 static void nft_arp_post_parse(int command,
 			       struct iptables_command_state *cs,
 			       struct xtables_args *args)
@@ -831,6 +838,7 @@ struct nft_family_ops nft_family_ops_arp = {
 	.save_chain		= nft_arp_save_chain,
 	.rule_parse		= &nft_ruleparse_ops_arp,
 	.cmd_parse		= {
+		.proto_parse	= nft_arp_proto_parse_warn,
 		.post_parse	= nft_arp_post_parse,
 		.option_name	= nft_arp_option_name,
 		.option_invert	= nft_arp_option_invert,
