@@ -6,16 +6,6 @@
 #include <string.h>
 #include <xtables.h>
 #include <linux/netfilter_ipv4/ipt_REJECT.h>
-#include <linux/version.h>
-
-/* If we are compiling against a kernel that does not support
- * IPT_ICMP_ADMIN_PROHIBITED, we are emulating it.
- * The result will be a plain DROP of the packet instead of
- * reject. -- Maciej Soltysiak <solt@dns.toxicfilms.tv>
- */
-#ifndef IPT_ICMP_ADMIN_PROHIBITED
-#define IPT_ICMP_ADMIN_PROHIBITED	IPT_TCP_RESET + 1
-#endif
 
 struct reject_names {
 	const char *name;
@@ -73,7 +63,7 @@ static const struct reject_names reject_table[] = {
 	},
 	[IPT_ICMP_ADMIN_PROHIBITED] = {
 		"icmp-admin-prohibited", "admin-prohib",
-		"ICMP administratively prohibited (*)",
+		"ICMP administratively prohibited",
 		"admin-prohibited",
 	},
 };
@@ -102,8 +92,6 @@ static void REJECT_help(void)
 "                                a reply packet according to type:\n");
 
 	print_reject_types();
-
-	printf("(*) See man page or read the INCOMPATIBILITES file for compatibility issues.\n");
 }
 
 static const struct xt_option_entry REJECT_opts[] = {
