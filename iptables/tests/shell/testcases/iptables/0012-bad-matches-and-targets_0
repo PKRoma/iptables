@@ -1,0 +1,103 @@
+#!/bin/sh
+
+set -x
+
+die() {
+	local flavor="$1"
+	echo "$1: $2 was accepted"
+	$XT_MULTI "$flavor-save"
+	exit 1
+}
+
+die_err() {
+	local flavor="$1"
+	echo "$1: $2 should work"
+	$XT_MULTI "$flavor-save"
+	exit 1
+}
+
+do_link() {
+	local flavor="$1"
+	local chain="$2"
+
+	$XT_MULTI "$flavor" -t mangle -A "$chain" -j USERCHAIN && die "$flavor" "$chain -j USERCHAIN"
+
+	$XT_MULTI "$flavor" -t mangle -F USERCHAIN || die_err "$flavor" "flush USERCHAIN"
+}
+
+do_link_prerouting() {
+	do_link "$1" "PREROUTING"
+}
+
+do_link_output() {
+	do_link "$1" "OUTPUT"
+}
+
+check_TCPMSS() {
+	local flavor="$1"
+
+	$XT_MULTI "$flavor" -t mangle -A PREROUTING -p tcp --syn -j TCPMSS --clamp-mss-to-pmtu && die "$flavor" "TCPMSS in PREROUTING"
+
+	$XT_MULTI "$flavor" -t mangle -A USERCHAIN -p tcp --syn -j TCPMSS --clamp-mss-to-pmtu || die_err "$flavor" "TCPMSS in USERCHAIN"
+	do_link_prerouting "$flavor"
+}
+
+check_addrtype() {
+	local flavor="$1"
+
+	$XT_MULTI "$flavor" -t mangle -A PREROUTING -m addrtype --limit-iface-out --src-type UNICAST && die "$flavor" "addrtype iface-out in PREROUTING"
+
+	$XT_MULTI "$flavor" -t mangle -A OUTPUT -m addrtype --limit-iface-in  --src-type UNICAST && die "$flavor" "addrtype in iface-in OUTPUT"
+
+	$XT_MULTI "$flavor" -t mangle -A USERCHAIN -m addrtype --limit-iface-out --src-type UNICAST || die_err "$flavor" "addrtype iface-out in USERCHAIN"
+	do_link_prerouting "$flavor"
+
+	$XT_MULTI "$flavor" -t mangle -A USERCHAIN -m addrtype --limit-iface-in  --src-type UNICAST || die_err "$flavor" "addrtype iface-in in USERCHAIN"
+	do_link_output "$flavor"
+}
+
+check_devgroup() {
+	local flavor="$1"
+
+	$XT_MULTI "$flavor" -t mangle -A PREROUTING -m devgroup --dst-group 1 && die "$flavor" "dst-group in PREROUTING"
+
+	$XT_MULTI "$flavor" -t mangle -A USERCHAIN -m devgroup --dst-group 1 || die_err  "$flavor" "dst-group in USERCHAIN"
+	do_link_prerouting "$flavor"
+
+	$XT_MULTI "$flavor" -t mangle -A OUTPUT -m devgroup --src-group 1 && die "$flavor" "src-group in OUTPUT"
+	$XT_MULTI "$flavor" -t mangle -A USERCHAIN -m devgroup --src-group 1 || die_err "$flavor" "src-group in USERCHAIN"
+	do_link_output "$flavor"
+}
+
+check_physdev() {
+	local flavor="$1"
+
+	$XT_MULTI "$flavor" -t mangle -A OUTPUT -m physdev --physdev-out "foo" && die "$flavor" "physdev-out in OUTPUT"
+	$XT_MULTI "$flavor" -t mangle -A OUTPUT -m physdev --physdev-out "foo" --physdev-is-out && die "$flavor" "physdev-out in OUTPUT"
+
+	$XT_MULTI "$flavor" -t mangle -A USERCHAIN -m physdev --physdev-out "foo" || die_err "$flavor" "physdev-out in USERCHAIN"
+	do_link_output "$flavor"
+	$XT_MULTI "$flavor" -t mangle -A USERCHAIN -m physdev --physdev-out "foo" --physdev-is-out || die_err "$flavor" "physdev-out in USERCHAIN"
+	do_link_output "$flavor"
+}
+
+check_policy() {
+	local flavor="$1"
+
+	$XT_MULTI "$flavor" -t mangle -A OUTPUT -m policy --dir in --pol none && die "$flavor" "policy dir in OUTPUT"
+	$XT_MULTI "$flavor" -t mangle -A PREROUTING -m policy --dir out --pol none && die "$flavor" "policy dir out PREROUTING"
+
+	$XT_MULTI "$flavor" -t mangle -A USERCHAIN -m policy --dir in --pol none || die_err "$flavor" "policy dir in USERCHAIN"
+	do_link_output "$flavor"
+	$XT_MULTI "$flavor" -t mangle -A USERCHAIN -m policy --dir out --pol none || die_err "$flavor" "policy dir out USERCHAIN"
+	do_link_prerouting "$flavor"
+}
+
+for f in "iptables" "ip6tables";do
+	$XT_MULTI "$f" -t mangle -N USERCHAIN || die_err "$f" "cannot create USERCHAIN"
+	check_TCPMSS "$f"
+	check_addrtype "$f"
+	check_devgroup "$f"
+	check_physdev "$f"
+	check_policy "$f"
+done
