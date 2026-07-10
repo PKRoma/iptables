@@ -1,6 +1,7 @@
 :INPUT,FORWARD
 -m physdev --physdev-in lo;=;OK
 -m physdev --physdev-is-in --physdev-in lo;=;OK
+-m physdev --physdev-is-in --physdev-in 1234567890abcde;=;OK
 :OUTPUT,FORWARD
 # xt_physdev: using --physdev-out in the OUTPUT, FORWARD and POSTROUTING chains for non-bridged traffic is not supported anymore.
 # ERROR: should fail: iptables -A FORWARD -m physdev --physdev-out lo
